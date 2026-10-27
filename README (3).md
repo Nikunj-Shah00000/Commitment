@@ -1,19 +1,19 @@
-# @babel/code-frame
+# @babel/helper-globals
 
-> Generate errors that contain a code frame that point to source locations.
+> A collection of JavaScript globals for Babel internal usage
 
-See our website [@babel/code-frame](https://babeljs.io/docs/babel-code-frame) for more information.
+See our website [@babel/helper-globals](https://babeljs.io/docs/babel-helper-globals) for more information.
 
 ## Install
 
 Using npm:
 
 ```sh
-npm install --save-dev @babel/code-frame
+npm install --save @babel/helper-globals
 ```
 
 or using yarn:
 
 ```sh
-yarn add @babel/code-frame --dev
+yarn add @babel/helper-globals
 ```

@@ -3,147 +3,93 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports._getTypeAnnotation = _getTypeAnnotation;
-exports.baseTypeStrictlyMatches = baseTypeStrictlyMatches;
-exports.couldBeBaseType = couldBeBaseType;
-exports.getTypeAnnotation = getTypeAnnotation;
-exports.isBaseType = isBaseType;
-exports.isGenericType = isGenericType;
-var inferers = require("./inferers.js");
+exports.TokenContext = void 0;
+exports.isLastChild = isLastChild;
+exports.parentNeedsParens = parentNeedsParens;
+var parens = require("./parentheses.js");
 var _t = require("@babel/types");
+var _nodes = require("../nodes.js");
 const {
-  anyTypeAnnotation,
-  isAnyTypeAnnotation,
-  isArrayTypeAnnotation,
-  isBooleanTypeAnnotation,
-  isEmptyTypeAnnotation,
-  isFlowBaseAnnotation,
-  isGenericTypeAnnotation,
-  isIdentifier,
-  isMixedTypeAnnotation,
-  isNumberTypeAnnotation,
-  isStringTypeAnnotation,
-  isTSArrayType,
-  isTSTypeAnnotation,
-  isTSTypeReference,
-  isTupleTypeAnnotation,
-  isTypeAnnotation,
-  isUnionTypeAnnotation,
-  isVoidTypeAnnotation,
-  stringTypeAnnotation,
-  voidTypeAnnotation
+  VISITOR_KEYS
 } = _t;
-function getTypeAnnotation() {
-  let type = this.getData("typeAnnotation");
-  if (type != null) {
-    return type;
-  }
-  type = _getTypeAnnotation.call(this) || anyTypeAnnotation();
-  if (isTypeAnnotation(type) || isTSTypeAnnotation(type)) {
-    type = type.typeAnnotation;
-  }
-  this.setData("typeAnnotation", type);
-  return type;
-}
-const typeAnnotationInferringNodes = new WeakSet();
-function _getTypeAnnotation() {
-  const node = this.node;
-  if (!node) {
-    if (this.key === "init" && this.parentPath.isVariableDeclarator()) {
-      const declar = this.parentPath.parentPath;
-      const declarParent = declar.parentPath;
-      if (declar.key === "left" && declarParent.isForInStatement()) {
-        return stringTypeAnnotation();
-      }
-      if (declar.key === "left" && declarParent.isForOfStatement()) {
-        return anyTypeAnnotation();
-      }
-      return voidTypeAnnotation();
-    } else {
-      return;
-    }
-  }
-  if (node.typeAnnotation) {
-    return node.typeAnnotation;
-  }
-  if (typeAnnotationInferringNodes.has(node)) {
-    return;
-  }
-  typeAnnotationInferringNodes.add(node);
-  try {
-    var _inferer;
-    let inferer = inferers[node.type];
-    if (inferer) {
-      return inferer.call(this, node);
-    }
-    inferer = inferers[this.parentPath.type];
-    if ((_inferer = inferer) != null && _inferer.validParent) {
-      return this.parentPath.getTypeAnnotation();
-    }
-  } finally {
-    typeAnnotationInferringNodes.delete(node);
+const TokenContext = exports.TokenContext = {
+  normal: 0,
+  expressionStatement: 1,
+  arrowBody: 2,
+  exportDefault: 4,
+  arrowFlowReturnType: 8,
+  forInitHead: 16,
+  forInHead: 32,
+  forOfHead: 64,
+  forInOrInitHeadAccumulate: 128,
+  forInOrInitHeadAccumulatePassThroughMask: 128
+};
+for (const type of Object.keys(parens)) {
+  const func = parens[type];
+  if (_nodes.generatorInfosMap.has(type)) {
+    _nodes.generatorInfosMap.get(type)[2] = func;
   }
 }
-function isBaseType(baseName, soft) {
-  return _isBaseType(baseName, this.getTypeAnnotation(), soft);
-}
-function _isBaseType(baseName, type, soft) {
-  if (baseName === "string") {
-    return isStringTypeAnnotation(type);
-  } else if (baseName === "number") {
-    return isNumberTypeAnnotation(type);
-  } else if (baseName === "boolean") {
-    return isBooleanTypeAnnotation(type);
-  } else if (baseName === "any") {
-    return isAnyTypeAnnotation(type);
-  } else if (baseName === "mixed") {
-    return isMixedTypeAnnotation(type);
-  } else if (baseName === "empty") {
-    return isEmptyTypeAnnotation(type);
-  } else if (baseName === "void") {
-    return isVoidTypeAnnotation(type);
-  } else {
-    if (soft) {
-      return false;
-    } else {
-      throw new Error(`Unknown base type ${baseName}`);
-    }
-  }
-}
-function couldBeBaseType(name) {
-  const type = this.getTypeAnnotation();
-  if (isAnyTypeAnnotation(type)) return true;
-  if (isUnionTypeAnnotation(type)) {
-    for (const type2 of type.types) {
-      if (isAnyTypeAnnotation(type2) || _isBaseType(name, type2, true)) {
+function newCalleeNeedsParens(node) {
+  let current = node;
+  while (true) {
+    switch (current.type) {
+      case "CallExpression":
+      case "ImportExpression":
+      case "OptionalCallExpression":
+      case "OptionalMemberExpression":
         return true;
-      }
+      case "MemberExpression":
+        current = current.object;
+        break;
+      case "TaggedTemplateExpression":
+        current = current.tag;
+        break;
+      case "TSNonNullExpression":
+        current = current.expression;
+        break;
+      default:
+        return false;
     }
-    return false;
-  } else {
-    return _isBaseType(name, type, true);
   }
 }
-function baseTypeStrictlyMatches(rightArg) {
-  const left = this.getTypeAnnotation();
-  const right = rightArg.getTypeAnnotation();
-  if (!isAnyTypeAnnotation(left) && isFlowBaseAnnotation(left)) {
-    return right.type === left.type;
+function parentNeedsParens(node, parent, parentId) {
+  switch (parentId) {
+    case 112:
+      if (parent.callee === node) {
+        return newCalleeNeedsParens(node);
+      }
+      break;
+    case 42:
+      return !isDecoratorMemberExpression(node) && !(node.type === "CallExpression" && isDecoratorMemberExpression(node.callee)) && node.type !== "ParenthesizedExpression";
   }
   return false;
 }
-function isGenericType(genericName) {
-  const type = this.getTypeAnnotation();
-  if (genericName === "Array") {
-    if (isTSArrayType(type) || isArrayTypeAnnotation(type) || isTupleTypeAnnotation(type)) {
+function isDecoratorMemberExpression(node) {
+  switch (node.type) {
+    case "Identifier":
       return true;
+    case "MemberExpression":
+      return !node.computed && node.property.type === "Identifier" && isDecoratorMemberExpression(node.object);
+    default:
+      return false;
+  }
+}
+function isLastChild(parent, child) {
+  const visitorKeys = VISITOR_KEYS[parent.type];
+  for (let i = visitorKeys.length - 1; i >= 0; i--) {
+    const val = parent[visitorKeys[i]];
+    if (val === child) {
+      return true;
+    } else if (Array.isArray(val)) {
+      let j = val.length - 1;
+      while (j >= 0 && val[j] === null) j--;
+      return j >= 0 && val[j] === child;
+    } else if (val) {
+      return false;
     }
   }
-  return isGenericTypeAnnotation(type) && isIdentifier(type.id, {
-    name: genericName
-  }) || isTSTypeReference(type) && isIdentifier(type.typeName, {
-    name: genericName
-  });
+  return false;
 }
 
 //# sourceMappingURL=index.js.map

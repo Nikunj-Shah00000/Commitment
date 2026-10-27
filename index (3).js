@@ -3,104 +3,106 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-Object.defineProperty(exports, "ALIAS_KEYS", {
-  enumerable: true,
-  get: function () {
-    return _utils.ALIAS_KEYS;
-  }
-});
-Object.defineProperty(exports, "BUILDER_KEYS", {
-  enumerable: true,
-  get: function () {
-    return _utils.BUILDER_KEYS;
-  }
-});
-Object.defineProperty(exports, "DEPRECATED_ALIASES", {
-  enumerable: true,
-  get: function () {
-    return _deprecatedAliases.DEPRECATED_ALIASES;
-  }
-});
-Object.defineProperty(exports, "DEPRECATED_KEYS", {
-  enumerable: true,
-  get: function () {
-    return _utils.DEPRECATED_KEYS;
-  }
-});
-Object.defineProperty(exports, "FLIPPED_ALIAS_KEYS", {
-  enumerable: true,
-  get: function () {
-    return _utils.FLIPPED_ALIAS_KEYS;
-  }
-});
-Object.defineProperty(exports, "NODE_FIELDS", {
-  enumerable: true,
-  get: function () {
-    return _utils.NODE_FIELDS;
-  }
-});
-Object.defineProperty(exports, "NODE_PARENT_VALIDATIONS", {
-  enumerable: true,
-  get: function () {
-    return _utils.NODE_PARENT_VALIDATIONS;
-  }
-});
-Object.defineProperty(exports, "NODE_UNION_SHAPES__PRIVATE", {
-  enumerable: true,
-  get: function () {
-    return _utils.NODE_UNION_SHAPES__PRIVATE;
-  }
-});
-Object.defineProperty(exports, "PLACEHOLDERS", {
-  enumerable: true,
-  get: function () {
-    return _placeholders.PLACEHOLDERS;
-  }
-});
-Object.defineProperty(exports, "PLACEHOLDERS_ALIAS", {
-  enumerable: true,
-  get: function () {
-    return _placeholders.PLACEHOLDERS_ALIAS;
-  }
-});
-Object.defineProperty(exports, "PLACEHOLDERS_FLIPPED_ALIAS", {
-  enumerable: true,
-  get: function () {
-    return _placeholders.PLACEHOLDERS_FLIPPED_ALIAS;
-  }
-});
-exports.TYPES = void 0;
-Object.defineProperty(exports, "VISITOR_KEYS", {
-  enumerable: true,
-  get: function () {
-    return _utils.VISITOR_KEYS;
-  }
-});
-require("./core.js");
-require("./flow.js");
-require("./jsx.js");
-require("./misc.js");
-require("./experimental.js");
-require("./typescript.js");
-var _utils = require("./utils.js");
-var _placeholders = require("./placeholders.js");
-var _deprecatedAliases = require("./deprecated-aliases.js");
-Object.keys(_deprecatedAliases.DEPRECATED_ALIASES).forEach(deprecatedAlias => {
-  _utils.FLIPPED_ALIAS_KEYS[deprecatedAlias] = _utils.FLIPPED_ALIAS_KEYS[_deprecatedAliases.DEPRECATED_ALIASES[deprecatedAlias]];
-});
-for (const {
-  types,
-  set
-} of _utils.allExpandedTypes) {
-  for (const type of types) {
-    const aliases = _utils.FLIPPED_ALIAS_KEYS[type];
-    if (aliases) {
-      aliases.forEach(set.add, set);
-    } else {
-      set.add(type);
+exports.default = void 0;
+exports.generate = generate;
+var _sourceMap = require("./source-map.js");
+var _printer = require("./printer.js");
+function normalizeOptions(code, opts, ast) {
+  var _opts$recordAndTupleS;
+  if (opts.experimental_preserveFormat) {
+    if (typeof code !== "string") {
+      throw new Error("`experimental_preserveFormat` requires the original `code` to be passed to @babel/generator as a string");
+    }
+    if (!opts.retainLines) {
+      throw new Error("`experimental_preserveFormat` requires `retainLines` to be set to `true`");
+    }
+    if (opts.compact && opts.compact !== "auto") {
+      throw new Error("`experimental_preserveFormat` is not compatible with the `compact` option");
+    }
+    if (opts.minified) {
+      throw new Error("`experimental_preserveFormat` is not compatible with the `minified` option");
+    }
+    if (opts.jsescOption) {
+      throw new Error("`experimental_preserveFormat` is not compatible with the `jsescOption` option");
+    }
+    if (!Array.isArray(ast.tokens)) {
+      throw new Error("`experimental_preserveFormat` requires the AST to have attached the token of the input code. Make sure to enable the `tokens: true` parser option.");
     }
   }
+  const format = {
+    auxiliaryCommentBefore: opts.auxiliaryCommentBefore,
+    auxiliaryCommentAfter: opts.auxiliaryCommentAfter,
+    shouldPrintComment: opts.shouldPrintComment,
+    preserveFormat: opts.experimental_preserveFormat,
+    retainLines: opts.retainLines,
+    retainFunctionParens: opts.retainFunctionParens,
+    comments: opts.comments == null || opts.comments,
+    compact: opts.compact,
+    minified: opts.minified,
+    concise: opts.concise,
+    indent: {
+      adjustMultilineComment: true,
+      style: "  "
+    },
+    jsescOption: Object.assign({
+      quotes: "double",
+      wrap: true,
+      minimal: false
+    }, opts.jsescOption),
+    topicToken: opts.topicToken
+  };
+  format.decoratorsBeforeExport = opts.decoratorsBeforeExport;
+  format.jsescOption.json = opts.jsonCompatibleStrings;
+  format.recordAndTupleSyntaxType = (_opts$recordAndTupleS = opts.recordAndTupleSyntaxType) != null ? _opts$recordAndTupleS : "hash";
+  format.importAttributesKeyword = opts.importAttributesKeyword;
+  if (format.minified) {
+    format.compact = true;
+    format.shouldPrintComment = format.shouldPrintComment || (() => format.comments);
+  } else {
+    format.shouldPrintComment = format.shouldPrintComment || (value => format.comments || value.includes("@license") || value.includes("@preserve"));
+  }
+  if (format.compact === "auto") {
+    format.compact = typeof code === "string" && code.length > 500000;
+    if (format.compact) {
+      console.error("[BABEL] Note: The code generator has deoptimised the styling of " + `${opts.filename} as it exceeds the max of ${"500KB"}.`);
+    }
+  }
+  if (format.compact || format.preserveFormat) {
+    format.indent.adjustMultilineComment = false;
+  }
+  const {
+    auxiliaryCommentBefore,
+    auxiliaryCommentAfter,
+    shouldPrintComment
+  } = format;
+  if (auxiliaryCommentBefore && !shouldPrintComment(auxiliaryCommentBefore)) {
+    format.auxiliaryCommentBefore = undefined;
+  }
+  if (auxiliaryCommentAfter && !shouldPrintComment(auxiliaryCommentAfter)) {
+    format.auxiliaryCommentAfter = undefined;
+  }
+  return format;
 }
-const TYPES = exports.TYPES = [].concat(Object.keys(_utils.VISITOR_KEYS), Object.keys(_utils.FLIPPED_ALIAS_KEYS), Object.keys(_utils.DEPRECATED_KEYS));
+exports.CodeGenerator = class CodeGenerator {
+  constructor(ast, opts = {}, code) {
+    this._ast = void 0;
+    this._format = void 0;
+    this._map = void 0;
+    this._ast = ast;
+    this._format = normalizeOptions(code, opts, ast);
+    this._map = opts.sourceMaps ? new _sourceMap.default(opts, code) : null;
+  }
+  generate() {
+    const printer = new _printer.default(this._format, this._map);
+    return printer.generate(this._ast);
+  }
+};
+function generate(ast, opts = {}, code) {
+  const format = normalizeOptions(code, opts, ast);
+  const map = opts.sourceMaps ? new _sourceMap.default(opts, code) : null;
+  const printer = new _printer.default(format, map, ast.tokens, typeof code === "string" ? code : null);
+  return printer.generate(ast);
+}
+var _default = exports.default = generate;
 
 //# sourceMappingURL=index.js.map
